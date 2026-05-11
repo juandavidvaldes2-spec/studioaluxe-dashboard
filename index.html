@@ -4,6 +4,66 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Studio A Luxe — Tablero operativo</title>
+<script>
+// Password gate — bloquea contenido antes de cargar nada
+(function(){
+  // Hash SHA-256 de la password. Para cambiar password, generá el hash en https://emn178.github.io/online-tools/sha256.html
+  const PASS_HASH = 'a8b91ff8e5cc6fc6f5e23a4f1d2cdbcf3b91c5e4d8a06b3e9c8c8d5a5e7b3c2f'; // placeholder, lo reemplazamos
+  const STORAGE_KEY = 'sal_dashboard_auth_v1';
+  const SESSION_HOURS = 24;
+  async function sha256(text){
+    const buf = new TextEncoder().encode(text);
+    const hash = await crypto.subtle.digest('SHA-256', buf);
+    return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }
+  function isAuthed(){
+    const t = localStorage.getItem(STORAGE_KEY);
+    if (!t) return false;
+    const expiry = parseInt(t, 10);
+    return Date.now() < expiry;
+  }
+  async function gate(){
+    if (isAuthed()) return true;
+    document.body.style.display = 'none';
+    // create overlay
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:#faf8f4;display:flex;align-items:center;justify-content:center;z-index:99999999;font-family:system-ui,sans-serif';
+    overlay.innerHTML = `
+      <div style="background:white;padding:40px;border-radius:16px;border:1px solid #ece7dc;box-shadow:0 6px 20px rgba(60,50,20,0.08);max-width:380px;width:90%;text-align:center">
+        <div style="font-size:0.7rem;letter-spacing:4px;text-transform:uppercase;color:#b8923a;font-weight:600;margin-bottom:12px">Tablero operativo</div>
+        <h1 style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:700;color:#1a1a24;margin-bottom:24px">Studio A Luxe</h1>
+        <p style="color:#6b6b78;font-size:0.85rem;margin-bottom:20px">Ingresa la contraseña para acceder al tablero</p>
+        <input id="gate-pass" type="password" placeholder="Contraseña" style="width:100%;padding:12px 14px;border:1px solid #dcd4c2;border-radius:10px;font-size:0.95rem;margin-bottom:12px;outline:none;font-family:inherit" autofocus />
+        <button id="gate-btn" style="width:100%;padding:12px 14px;background:#b8923a;color:white;border:none;border-radius:10px;font-size:0.95rem;font-weight:600;cursor:pointer;font-family:inherit">Entrar</button>
+        <p id="gate-err" style="color:#c44a4a;font-size:0.8rem;margin-top:14px;display:none">Contraseña incorrecta</p>
+      </div>`;
+    document.documentElement.appendChild(overlay);
+    return new Promise(resolve => {
+      const input = overlay.querySelector('#gate-pass');
+      const btn = overlay.querySelector('#gate-btn');
+      const err = overlay.querySelector('#gate-err');
+      const tryPass = async () => {
+        const v = input.value;
+        if (!v) return;
+        const h = await sha256(v);
+        if (h === PASS_HASH) {
+          localStorage.setItem(STORAGE_KEY, String(Date.now() + SESSION_HOURS*3600*1000));
+          overlay.remove();
+          document.body.style.display = '';
+          resolve(true);
+        } else {
+          err.style.display = 'block';
+          input.value = '';
+          input.focus();
+        }
+      };
+      btn.addEventListener('click', tryPass);
+      input.addEventListener('keydown', e => { if (e.key === 'Enter') tryPass(); });
+    });
+  }
+  window.__gatePromise = gate();
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
@@ -28,13 +88,11 @@
   --orange:#c97f2a;
   --shadow-sm:0 1px 2px rgba(60,50,20,0.04);
   --shadow:0 2px 8px rgba(60,50,20,0.06);
-  --shadow-lg:0 6px 20px rgba(60,50,20,0.08);
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
 body{padding:32px 24px 80px;max-width:1400px;margin:0 auto}
 
-/* HEADER */
 .header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:48px;flex-wrap:wrap;gap:24px;padding-bottom:32px;border-bottom:1px solid var(--border)}
 .brand{display:flex;flex-direction:column;gap:8px}
 .brand-tag{font-size:0.7rem;letter-spacing:4px;text-transform:uppercase;color:var(--gold);font-weight:600}
@@ -45,8 +103,9 @@ body{padding:32px 24px 80px;max-width:1400px;margin:0 auto}
 .meta strong{color:var(--text);font-weight:500}
 .live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;animation:pulse 2s infinite;box-shadow:0 0 0 3px rgba(58,157,131,0.15)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.refresh-btn{padding:6px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;color:var(--text-muted);font-size:0.78rem;cursor:pointer;font-family:inherit;font-weight:500;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s}
+.refresh-btn:hover{border-color:var(--gold);color:var(--gold)}
 
-/* KPI GRID */
 .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:40px}
 @media(max-width:900px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
 .kpi{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:24px;transition:all 0.3s;position:relative;overflow:hidden;box-shadow:var(--shadow-sm)}
@@ -59,23 +118,20 @@ body{padding:32px 24px 80px;max-width:1400px;margin:0 auto}
 .kpi-currency{font-size:1.1rem;color:var(--text-muted);font-weight:400;margin-right:4px}
 .kpi-sub{font-size:0.78rem;color:var(--text-muted);margin-top:8px}
 .kpi-sub strong{color:var(--text);font-weight:600}
+.kpi-value.loading{opacity:0.3}
 
-/* SECTION */
 .section{margin-bottom:40px}
 .section-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px}
 .section-title{font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:700;color:var(--text)}
 .section-sub{color:var(--text-muted);font-size:0.85rem;font-weight:300;margin-top:4px}
 .tag{display:inline-block;padding:5px 12px;font-size:0.7rem;letter-spacing:1px;text-transform:uppercase;border-radius:50px;background:var(--gold-soft);color:var(--gold);font-weight:600;border:1px solid rgba(184,146,58,0.18)}
 
-/* CARD */
 .card{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:24px;box-shadow:var(--shadow-sm)}
 .card-chart{padding:16px 16px 0}
 
-/* TWO COLUMN */
 .two-col{display:grid;grid-template-columns:1.4fr 1fr;gap:20px;margin-bottom:40px}
 @media(max-width:1100px){.two-col{grid-template-columns:1fr}}
 
-/* TABLE */
 .table-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:0.86rem}
 thead th{text-align:left;padding:14px;font-size:0.7rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border-strong);background:var(--bg-soft)}
@@ -93,7 +149,6 @@ tbody tr:last-child td{border-bottom:none}
 .badge-danger{background:rgba(196,74,74,0.1);color:var(--red);border:1px solid rgba(196,74,74,0.2)}
 .badge-ok{background:rgba(58,157,131,0.1);color:var(--green);border:1px solid rgba(58,157,131,0.2)}
 
-/* CONSIGNANTE PILL */
 .consig-row{display:grid;grid-template-columns:1.4fr 60px 90px 110px;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);align-items:center}
 .consig-row:last-child{border-bottom:none}
 .consig-name{font-weight:500;color:var(--text);font-size:0.9rem}
@@ -101,7 +156,6 @@ tbody tr:last-child td{border-bottom:none}
 .consig-head{padding-bottom:10px;border-bottom:1px solid var(--border-strong)}
 .consig-head span{color:var(--text-muted);font-size:0.68rem;letter-spacing:1.5px;text-transform:uppercase;font-weight:600}
 
-/* ALERT CARDS */
 .alert-card{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;transition:all 0.2s}
 .alert-card:hover{border-color:var(--border-strong)}
 .alert-card.warn{background:rgba(201,127,42,0.04);border-color:rgba(201,127,42,0.18)}
@@ -110,7 +164,6 @@ tbody tr:last-child td{border-bottom:none}
 .alert-name{font-weight:500;font-size:0.92rem}
 .alert-detail{font-size:0.78rem;color:var(--text-muted);margin-top:2px}
 
-/* WORKFLOW STATUS */
 .wf-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 @media(max-width:900px){.wf-grid{grid-template-columns:1fr}}
 .wf-card{padding:18px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-sm)}
@@ -118,12 +171,17 @@ tbody tr:last-child td{border-bottom:none}
 .wf-name{font-weight:600;font-size:0.95rem}
 .wf-status{display:inline-flex;align-items:center;gap:6px;font-size:0.78rem;color:var(--green);font-weight:500}
 
-/* FOOTER */
 .footer{margin-top:60px;padding-top:32px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;font-size:0.78rem;color:var(--text-muted)}
 .footer .by strong{background:linear-gradient(135deg,var(--gold),var(--teal));-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:700}
 
-/* CHART CONTAINER */
 .chart-box{position:relative;height:340px}
+.skeleton{background:linear-gradient(90deg,var(--bg-soft) 0%,var(--border) 50%,var(--bg-soft) 100%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px;color:transparent}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+#loading-overlay{position:fixed;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--gold),var(--teal),var(--gold));background-size:200% 100%;animation:loading-bar 1.5s infinite;z-index:99999}
+#loading-overlay.hidden{display:none}
+@keyframes loading-bar{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.error-banner{padding:14px;background:rgba(196,74,74,0.08);border:1px solid rgba(196,74,74,0.2);border-radius:10px;color:var(--red);margin-bottom:24px;display:none}
+.error-banner.show{display:block}
 
 @media(max-width:600px){
   body{padding:20px 14px 60px}
@@ -138,6 +196,8 @@ tbody tr:last-child td{border-bottom:none}
 </head>
 <body>
 
+<div id="loading-overlay"></div>
+
 <!-- HEADER -->
 <div class="header">
   <div class="brand">
@@ -146,33 +206,35 @@ tbody tr:last-child td{border-bottom:none}
     <p class="brand-sub">Visión en vivo de ventas, abonos, saldos y consignantes</p>
   </div>
   <div class="meta">
-    <span><span class="live-dot"></span><strong id="meta-date">9 mayo 2026</strong></span>
-    <span>Datos sincronizados con la hoja de operaciones</span>
-    <span>Actualización al momento</span>
+    <span><span class="live-dot"></span><strong id="meta-date">Cargando datos…</strong></span>
+    <span id="meta-ts">Conectado a la hoja de operaciones</span>
+    <button class="refresh-btn" id="refresh-btn" onclick="loadAll()">⟳ Actualizar</button>
   </div>
 </div>
+
+<div class="error-banner" id="error-banner"></div>
 
 <!-- KPIs -->
 <div class="kpi-grid">
   <div class="kpi">
     <div class="kpi-label">Por cobrar hoy</div>
-    <div class="kpi-value gold"><span class="kpi-currency">$</span>13,352</div>
-    <div class="kpi-sub"><strong>122</strong> ventas con saldo abierto</div>
+    <div class="kpi-value gold" id="kpi-porcobrar"><span class="kpi-currency">$</span><span class="skeleton">000</span></div>
+    <div class="kpi-sub" id="kpi-porcobrar-sub">&nbsp;</div>
   </div>
   <div class="kpi">
     <div class="kpi-label">Ventas registradas</div>
-    <div class="kpi-value"><span class="kpi-currency">$</span>18,536</div>
-    <div class="kpi-sub"><strong>132</strong> ventas totales · <strong>115</strong> clientes</div>
+    <div class="kpi-value" id="kpi-ventas"><span class="kpi-currency">$</span><span class="skeleton">000</span></div>
+    <div class="kpi-sub" id="kpi-ventas-sub">&nbsp;</div>
   </div>
   <div class="kpi">
     <div class="kpi-label">Total abonado</div>
-    <div class="kpi-value teal"><span class="kpi-currency">$</span>15,915</div>
-    <div class="kpi-sub"><strong>318</strong> abonos recibidos</div>
+    <div class="kpi-value teal" id="kpi-abonado"><span class="kpi-currency">$</span><span class="skeleton">000</span></div>
+    <div class="kpi-sub" id="kpi-abonado-sub">&nbsp;</div>
   </div>
   <div class="kpi">
     <div class="kpi-label">Listas para despacho</div>
-    <div class="kpi-value">6</div>
-    <div class="kpi-sub">Saldadas esperando empaque</div>
+    <div class="kpi-value" id="kpi-despacho"><span class="skeleton">0</span></div>
+    <div class="kpi-sub" id="kpi-despacho-sub">Saldadas esperando empaque</div>
   </div>
 </div>
 
@@ -197,14 +259,7 @@ tbody tr:last-child td{border-bottom:none}
       <span class="consig-stat">Comisión</span>
       <span class="consig-stat">Deuda</span>
     </div>
-    <div class="consig-row"><span class="consig-name">SA</span><span class="consig-stat">9</span><span class="consig-stat" style="color:var(--gold);font-weight:600">$821.60</span><span class="consig-stat">$1,166.69</span></div>
-    <div class="consig-row"><span class="consig-name">W</span><span class="consig-stat">11</span><span class="consig-stat" style="color:var(--gold);font-weight:600">$799.60</span><span class="consig-stat">$1,602.78</span></div>
-    <div class="consig-row"><span class="consig-name">FloraI (Flora Ibarra)</span><span class="consig-stat">7</span><span class="consig-stat" style="color:var(--gold);font-weight:600">$501.20</span><span class="consig-stat">$934.15</span></div>
-    <div class="consig-row"><span class="consig-name">JuliaG</span><span class="consig-stat">8</span><span class="consig-stat" style="color:var(--gold);font-weight:600">$283.90</span><span class="consig-stat">$411.00</span></div>
-    <div class="consig-row"><span class="consig-name">TaniaA (Tania Arguello)</span><span class="consig-stat">1</span><span class="consig-stat" style="color:var(--gold);font-weight:600">$239.40</span><span class="consig-stat">$698.00</span></div>
-    <div class="consig-row"><span class="consig-name">MariaAlejandraR</span><span class="consig-stat">4</span><span class="consig-stat" style="color:var(--gold);font-weight:600">$224.80</span><span class="consig-stat">$475.04</span></div>
-    <div class="consig-row"><span class="consig-name">AniP (Ani Parra)</span><span class="consig-stat">3</span><span class="consig-stat" style="color:var(--gold);font-weight:600">$231.40</span><span class="consig-stat">$523.00</span></div>
-    <div class="consig-row"><span class="consig-name">DayraS</span><span class="consig-stat">1</span><span class="consig-stat" style="color:var(--gold);font-weight:600">$139.20</span><span class="consig-stat">$298.00</span></div>
+    <div id="consig-list"></div>
   </div>
 </div>
 
@@ -213,9 +268,9 @@ tbody tr:last-child td{border-bottom:none}
   <div class="section-head">
     <div>
       <h2 class="section-title">Cuentas por cobrar</h2>
-      <p class="section-sub">Top 20 ordenadas por antigüedad — total 122 cuentas abiertas</p>
+      <p class="section-sub" id="cobrar-sub">Top 20 ordenadas por antigüedad</p>
     </div>
-    <span class="tag">$13,352 pendientes</span>
+    <span class="tag" id="cobrar-total">$0 pendientes</span>
   </div>
   <div class="card" style="padding:0;overflow:hidden">
     <div class="table-wrap">
@@ -243,43 +298,7 @@ tbody tr:last-child td{border-bottom:none}
       <h2 class="section-title" style="font-size:1.2rem">Alertas de cobro</h2>
       <p class="section-sub">Cuentas con más de 14 días sin saldar</p>
     </div>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <div class="alert-card danger">
-        <div>
-          <div class="alert-name">Yitzel Jaén</div>
-          <div class="alert-detail">Adidas zapatillas naranja · 23 días</div>
-        </div>
-        <span class="badge badge-danger">$23</span>
-      </div>
-      <div class="alert-card danger">
-        <div>
-          <div class="alert-name">Daniel Araúz</div>
-          <div class="alert-detail">Ferragamo cartera · 16 días · sin abono</div>
-        </div>
-        <span class="badge badge-danger">$298</span>
-      </div>
-      <div class="alert-card warn">
-        <div>
-          <div class="alert-name">Bonny Sanchez</div>
-          <div class="alert-detail">Ferragamo zapatos · 17 días · sin abono</div>
-        </div>
-        <span class="badge badge-warn">$158</span>
-      </div>
-      <div class="alert-card warn">
-        <div>
-          <div class="alert-name">Anayansi Iglesias</div>
-          <div class="alert-detail">Valentino plataformas · 16 días</div>
-        </div>
-        <span class="badge badge-warn">$263</span>
-      </div>
-      <div class="alert-card warn">
-        <div>
-          <div class="alert-name">Milanys Rodríguez</div>
-          <div class="alert-detail">Ferragamo cartera camel · 16 días</div>
-        </div>
-        <span class="badge badge-warn">$233</span>
-      </div>
-    </div>
+    <div id="alertas-list" style="display:flex;flex-direction:column;gap:10px"></div>
   </div>
 
   <div class="card">
@@ -287,25 +306,7 @@ tbody tr:last-child td{border-bottom:none}
       <h2 class="section-title" style="font-size:1.2rem">Listas para despacho</h2>
       <p class="section-sub">Saldadas esperando empaque por Wendy y Yanis</p>
     </div>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <div class="alert-card ok">
-        <div>
-          <div class="alert-name">Sheylove Paul</div>
-          <div class="alert-detail">Hermes neceser</div>
-        </div>
-        <span class="badge badge-ok">Saldada</span>
-      </div>
-      <div class="alert-card ok">
-        <div>
-          <div class="alert-name">Madeline De Icaza</div>
-          <div class="alert-detail">Mirto pantalón azul</div>
-        </div>
-        <span class="badge badge-ok">Saldada</span>
-      </div>
-      <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.85rem">
-        + 4 más listas para despachar
-      </div>
-    </div>
+    <div id="despacho-list" style="display:flex;flex-direction:column;gap:10px"></div>
   </div>
 </div>
 
@@ -337,7 +338,7 @@ tbody tr:last-child td{border-bottom:none}
         <span class="wf-name">Cron Vencidos</span>
         <span class="wf-status"><span class="live-dot"></span>Activo</span>
       </div>
-      <div style="font-size:0.78rem;color:var(--text-muted)">Revisión diaria de cuentas vencidas</div>
+      <div style="font-size:0.78rem;color:var(--text-muted)">Diario 9am, alerta a Anita cuentas con 91 días</div>
     </div>
   </div>
 </div>
@@ -349,79 +350,264 @@ tbody tr:last-child td{border-bottom:none}
 </div>
 
 <script>
-const labels = ["10 abr","11 abr","12 abr","13 abr","14 abr","15 abr","16 abr","17 abr","18 abr","19 abr","20 abr","21 abr","22 abr","23 abr","24 abr","25 abr","26 abr","27 abr","28 abr","29 abr","30 abr","1 may","2 may","3 may","4 may","5 may","6 may","7 may","8 may","9 may"];
-const ventas=[0,0,0,0,0,0,118,0,0,0,346,969,148,2395,609,1763,1952,1701,0,1459,782,68,1486,546,687,487,1433,827,429,331];
-const abonos=[0,0,0,0,0,0,20,0,0,0,250,713,1087,771,692,1028,827,708,310,1644,1565,543,677,170,870,640,608,930,728,1132];
+const SHEET_ID = '1sM3inbhdDt2FpF6jNPg1cJQn9WfFTnwuJBNB-hmO4Tw';
+const GVIZ = (sheet) => `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheet)}`;
 
-const ctx = document.getElementById('chartFlow').getContext('2d');
-const grad1 = ctx.createLinearGradient(0,0,0,300);
-grad1.addColorStop(0,'rgba(184,146,58,0.30)');
-grad1.addColorStop(1,'rgba(184,146,58,0)');
-const grad2 = ctx.createLinearGradient(0,0,0,300);
-grad2.addColorStop(0,'rgba(94,196,172,0.25)');
-grad2.addColorStop(1,'rgba(94,196,172,0)');
+let chartFlow = null;
 
-new Chart(ctx, {
-  type:'line',
-  data:{
-    labels,
-    datasets:[
-      {label:'Ventas ($)',data:ventas,borderColor:'#b8923a',backgroundColor:grad1,borderWidth:2.5,tension:0.35,fill:true,pointRadius:0,pointHoverRadius:5,pointBackgroundColor:'#b8923a'},
-      {label:'Abonos ($)',data:abonos,borderColor:'#5ec4ac',backgroundColor:grad2,borderWidth:2.5,tension:0.35,fill:true,pointRadius:0,pointHoverRadius:5,pointBackgroundColor:'#5ec4ac'}
-    ]
-  },
-  options:{
-    responsive:true,maintainAspectRatio:false,
-    interaction:{mode:'index',intersect:false},
-    plugins:{
-      legend:{position:'top',align:'end',labels:{color:'#6b6b78',font:{family:'Inter',size:11},boxWidth:10,boxHeight:10,padding:18}},
-      tooltip:{backgroundColor:'#ffffff',borderColor:'#dcd4c2',borderWidth:1,titleColor:'#b8923a',bodyColor:'#1a1a24',padding:12,callbacks:{label:c=>c.dataset.label+': $'+c.parsed.y.toLocaleString()}}
-    },
-    scales:{
-      x:{grid:{display:false},ticks:{color:'#9a9aa8',font:{family:'Inter',size:10},maxTicksLimit:10}},
-      y:{grid:{color:'rgba(60,50,20,0.05)'},ticks:{color:'#9a9aa8',font:{family:'Inter',size:10},callback:v=>'$'+(v>=1000?(v/1000)+'k':v)}}
-    }
+async function readSheet(name) {
+  const r = await fetch(GVIZ(name), { credentials: 'include' });
+  if (!r.ok) throw new Error(`No se pudo leer hoja ${name}`);
+  const txt = await r.text();
+  const j = JSON.parse(txt.replace(/^[^(]*\(/, '').replace(/\);?\s*$/, ''));
+  const cols = j.table.cols.map(c => c.label || c.id);
+  return j.table.rows.map(r => {
+    const o = {};
+    r.c.forEach((c, i) => {
+      const k = cols[i];
+      if (!k || /^[A-Z]$/.test(k)) return;
+      o[k] = c?.v ?? null;
+    });
+    return o;
+  });
+}
+
+function parseDate(s) {
+  if (!s) return null;
+  if (typeof s === 'string') {
+    const m = s.match(/Date\((\d+),(\d+),(\d+),?(\d+)?,?(\d+)?,?(\d+)?\)/);
+    if (m) return new Date(+m[1], +m[2], +m[3], +(m[4]||0), +(m[5]||0), +(m[6]||0));
+    const m2 = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})/);
+    if (m2) return new Date(+m2[3], +m2[2]-1, +m2[1], +m2[4], +m2[5], +m2[6]);
   }
-});
+  return null;
+}
 
-const cobrar = [
-  {c:"Yitzel Jaén",p:"Adidas zapatillas naranja",cs:"YohanaI",pr:118,s:23,d:23},
-  {c:"Victoria Gomez",p:"Fiucha zapatos flat",cs:"JuliaG",pr:65,s:40,d:18},
-  {c:"Victoria Gomez",p:"Carlota zapatos flat mostaza",cs:"AnaMayB",pr:118,s:93,d:18},
-  {c:"Zoila Valle",p:"KS plataformas negras",cs:"Eugenia C",pr:88,s:68,d:18},
-  {c:"Carmen Pérez",p:"MK zapatillas",cs:"JuliaG",pr:95,s:65,d:18},
-  {c:"Bonny Sanchez",p:"Ferragamo zapatos tacón",cs:"KilmaraV",pr:158,s:158,d:17},
-  {c:"R Ines Castillo",p:"AP camisa marrón",cs:"JuliaG",pr:35,s:25,d:17},
-  {c:"N Itzel Torraza",p:"TB lentes de sol",cs:"Lily",pr:148,s:118,d:17},
-  {c:"Daniel Araúz",p:"Ferragamo cartera",cs:"FloraI",pr:298,s:298,d:16},
-  {c:"Milanys Rodríguez",p:"Ferragamo cartera camel",cs:"FloraI",pr:298,s:233,d:16},
-  {c:"Anayansi Iglesias",p:"Valentino plataformas",cs:"GraceT",pr:298,s:263.08,d:16},
-  {c:"Darlene Montaner",p:"VC zapatos tacón camel",cs:"VictoriaC",pr:65,s:30,d:16},
-  {c:"R Nathalie Marin",p:"Coach wallet rojo",cs:"Jasmany",pr:98,s:78,d:16},
-  {c:"R Xavier Rios",p:"RB lentes",cs:"GabrielaC",pr:138,s:118,d:16},
-  {c:"R Johanna Castillo",p:"RB lentes",cs:"GabrielaC",pr:138,s:118,d:16},
-  {c:"R Pilar Santiago",p:"Set pantalón y camisa",cs:"MelindaD",pr:75,s:75,d:16},
-  {c:"Anayansi Iglesias",p:"Valentino flats negros",cs:"Walk",pr:238,s:193,d:15},
-  {c:"R Veira Arroyo",p:"KS cartera",cs:"FloraI",pr:168,s:118,d:15},
-  {c:"Anna Ledezma",p:"Strathberry cartera camel",cs:"FloraI",pr:178,s:103,d:15},
-  {c:"R Anita Villalaz",p:"Dior cross charol negro",cs:"W",pr:328,s:263,d:15}
-];
-const tbody = document.getElementById('tabla-cobrar');
-cobrar.forEach(r => {
-  const dBadge = r.d>=20 ? 'badge-danger' : r.d>=14 ? 'badge-warn' : 'badge-ok';
-  tbody.insertAdjacentHTML('beforeend', `<tr>
-    <td><strong>${r.c}</strong></td>
-    <td class="cell-muted">${r.p}</td>
-    <td class="cell-muted">${r.cs}</td>
-    <td class="cell-num cell-amount dim">$${r.pr}</td>
-    <td class="cell-num cell-amount">$${r.s.toLocaleString(undefined,{maximumFractionDigits:2})}</td>
-    <td class="cell-num"><span class="badge ${dBadge}">${r.d} d</span></td>
-  </tr>`);
-});
+const isTest = c => /test|prueba|juanda|cliente prueba|test fix|test final/i.test(String(c||''));
+const fmt$ = n => n.toLocaleString('en-US', {maximumFractionDigits: 0});
+const fmt$2 = n => n.toLocaleString('en-US', {maximumFractionDigits: 2});
 
-const today = new Date();
-const months=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-document.getElementById('meta-date').textContent = today.getDate()+' '+months[today.getMonth()]+' '+today.getFullYear();
+async function loadAll() {
+  const overlay = document.getElementById('loading-overlay');
+  const err = document.getElementById('error-banner');
+  overlay.classList.remove('hidden');
+  err.classList.remove('show');
+
+  try {
+    const [ventas, abonos] = await Promise.all([
+      readSheet('VENTAS'),
+      readSheet('ABONOS')
+    ]);
+
+    const ventasReales = ventas.filter(v => v.Cliente && !isTest(v.Cliente));
+    const abonosReales = abonos.filter(a => a.Cliente && !isTest(a.Cliente));
+
+    renderKPIs(ventasReales, abonosReales);
+    renderConsignantes(ventasReales);
+    renderTimeSeries(ventasReales, abonosReales);
+    renderCuentasPorCobrar(ventasReales);
+    renderAlertas(ventasReales);
+    renderDespacho(ventasReales);
+
+    // Update timestamp
+    const now = new Date();
+    const months=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    document.getElementById('meta-date').textContent = now.getDate()+' '+months[now.getMonth()]+' '+now.getFullYear();
+    document.getElementById('meta-ts').textContent = 'Actualizado: ' + now.toLocaleTimeString('es-PA', {hour:'2-digit', minute:'2-digit'});
+  } catch(e) {
+    console.error(e);
+    err.textContent = `Error cargando datos: ${e.message}. Verifica que tienes acceso a la hoja de Studio A Luxe.`;
+    err.classList.add('show');
+  } finally {
+    overlay.classList.add('hidden');
+  }
+}
+
+function renderKPIs(ventas, abonos) {
+  const totalPorCobrar = ventas.reduce((s,v) => s + Math.max(0, Number(v['Saldo pendiente']||0)), 0);
+  const totalVentas = ventas.reduce((s,v) => s + Number(v['Precio venta']||0), 0);
+  const totalAbonado = abonos.reduce((s,a) => s + Number(a['Monto abono']||0), 0);
+  const clientes = new Set(ventas.map(v => (v.Cliente||'').trim().toLowerCase())).size;
+  const abiertas = ventas.filter(v => Number(v['Saldo pendiente']||0) > 0).length;
+  const saldadas = ventas.filter(v => Number(v['Saldo pendiente']||0) === 0 && !isTest(v.Cliente)).length;
+
+  document.getElementById('kpi-porcobrar').innerHTML = '<span class="kpi-currency">$</span>' + fmt$(totalPorCobrar);
+  document.getElementById('kpi-porcobrar-sub').innerHTML = `<strong>${abiertas}</strong> ventas con saldo abierto`;
+
+  document.getElementById('kpi-ventas').innerHTML = '<span class="kpi-currency">$</span>' + fmt$(totalVentas);
+  document.getElementById('kpi-ventas-sub').innerHTML = `<strong>${ventas.length}</strong> ventas totales · <strong>${clientes}</strong> clientes`;
+
+  document.getElementById('kpi-abonado').innerHTML = '<span class="kpi-currency">$</span>' + fmt$(totalAbonado);
+  document.getElementById('kpi-abonado-sub').innerHTML = `<strong>${abonos.length}</strong> abonos recibidos`;
+
+  document.getElementById('kpi-despacho').textContent = saldadas;
+}
+
+function renderConsignantes(ventas) {
+  const m = {};
+  ventas.forEach(v => {
+    const c = (v.Consignante || 'Sin consignante').trim();
+    if (!m[c]) m[c] = { ventas: 0, comision: 0, deuda: 0 };
+    m[c].ventas++;
+    m[c].comision += Number(v['Comision consignante']||0);
+    m[c].deuda += Math.max(0, Number(v['Saldo pendiente']||0));
+  });
+  const list = Object.entries(m)
+    .sort((a,b) => b[1].comision - a[1].comision)
+    .slice(0, 8);
+  const html = list.map(([name, d]) => `
+    <div class="consig-row">
+      <span class="consig-name">${name}</span>
+      <span class="consig-stat">${d.ventas}</span>
+      <span class="consig-stat" style="color:var(--gold);font-weight:600">$${fmt$2(d.comision)}</span>
+      <span class="consig-stat">$${fmt$2(d.deuda)}</span>
+    </div>`).join('');
+  document.getElementById('consig-list').innerHTML = html;
+}
+
+function renderTimeSeries(ventas, abonos) {
+  const today = new Date();
+  const days = [];
+  for (let i=29; i>=0; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+    days.push({ label: d.toISOString().slice(0,10), display: d.toLocaleDateString('es-PA',{day:'numeric',month:'short'}), ventas: 0, abonos: 0 });
+  }
+  ventas.forEach(v => {
+    const d = parseDate(v.Fecha);
+    if (!d) return;
+    const day = days.find(x => x.label === d.toISOString().slice(0,10));
+    if (day) day.ventas += Number(v['Precio venta']||0);
+  });
+  abonos.forEach(a => {
+    const d = parseDate(a.Fecha);
+    if (!d) return;
+    const day = days.find(x => x.label === d.toISOString().slice(0,10));
+    if (day) day.abonos += Number(a['Monto abono']||0);
+  });
+
+  const labels = days.map(d => d.display);
+  const dataV = days.map(d => d.ventas);
+  const dataA = days.map(d => d.abonos);
+
+  const canvas = document.getElementById('chartFlow');
+  if (chartFlow) chartFlow.destroy();
+  const ctx = canvas.getContext('2d');
+  const grad1 = ctx.createLinearGradient(0,0,0,300);
+  grad1.addColorStop(0,'rgba(184,146,58,0.30)');
+  grad1.addColorStop(1,'rgba(184,146,58,0)');
+  const grad2 = ctx.createLinearGradient(0,0,0,300);
+  grad2.addColorStop(0,'rgba(94,196,172,0.25)');
+  grad2.addColorStop(1,'rgba(94,196,172,0)');
+
+  chartFlow = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels,
+      datasets:[
+        {label:'Ventas ($)',data:dataV,borderColor:'#b8923a',backgroundColor:grad1,borderWidth:2.5,tension:0.35,fill:true,pointRadius:0,pointHoverRadius:5,pointBackgroundColor:'#b8923a'},
+        {label:'Abonos ($)',data:dataA,borderColor:'#5ec4ac',backgroundColor:grad2,borderWidth:2.5,tension:0.35,fill:true,pointRadius:0,pointHoverRadius:5,pointBackgroundColor:'#5ec4ac'}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{position:'top',align:'end',labels:{color:'#6b6b78',font:{family:'Inter',size:11},boxWidth:10,boxHeight:10,padding:18}},
+        tooltip:{backgroundColor:'#ffffff',borderColor:'#dcd4c2',borderWidth:1,titleColor:'#b8923a',bodyColor:'#1a1a24',padding:12,callbacks:{label:c=>c.dataset.label+': $'+c.parsed.y.toLocaleString()}}
+      },
+      scales:{
+        x:{grid:{display:false},ticks:{color:'#9a9aa8',font:{family:'Inter',size:10},maxTicksLimit:10}},
+        y:{grid:{color:'rgba(60,50,20,0.05)'},ticks:{color:'#9a9aa8',font:{family:'Inter',size:10},callback:v=>'$'+(v>=1000?(v/1000)+'k':v)}}
+      }
+    }
+  });
+}
+
+function renderCuentasPorCobrar(ventas) {
+  const today = new Date();
+  const abiertas = ventas
+    .filter(v => Number(v['Saldo pendiente']||0) > 0)
+    .map(v => {
+      const d = parseDate(v.Fecha);
+      const dias = d ? Math.floor((today - d) / 86400000) : null;
+      return {
+        cliente: v.Cliente,
+        producto: v.Producto,
+        consignante: v.Consignante,
+        precio: Number(v['Precio venta']||0),
+        saldo: Number(v['Saldo pendiente']||0),
+        dias
+      };
+    })
+    .sort((a,b) => (b.dias||0) - (a.dias||0));
+
+  const total = abiertas.reduce((s,r) => s + r.saldo, 0);
+  document.getElementById('cobrar-total').textContent = '$' + fmt$(total) + ' pendientes';
+  document.getElementById('cobrar-sub').textContent = `Top 20 ordenadas por antigüedad — total ${abiertas.length} cuentas abiertas`;
+
+  const tbody = document.getElementById('tabla-cobrar');
+  tbody.innerHTML = '';
+  abiertas.slice(0, 20).forEach(r => {
+    const dBadge = (r.dias||0)>=20 ? 'badge-danger' : (r.dias||0)>=14 ? 'badge-warn' : 'badge-ok';
+    tbody.insertAdjacentHTML('beforeend', `<tr>
+      <td><strong>${r.cliente.trim()}</strong></td>
+      <td class="cell-muted">${(r.producto||'').trim()}</td>
+      <td class="cell-muted">${(r.consignante||'').trim()}</td>
+      <td class="cell-num cell-amount dim">$${r.precio}</td>
+      <td class="cell-num cell-amount">$${fmt$2(r.saldo)}</td>
+      <td class="cell-num"><span class="badge ${dBadge}">${r.dias||0} d</span></td>
+    </tr>`);
+  });
+}
+
+function renderAlertas(ventas) {
+  const today = new Date();
+  const alertas = ventas
+    .filter(v => Number(v['Saldo pendiente']||0) > 0)
+    .map(v => {
+      const d = parseDate(v.Fecha);
+      const dias = d ? Math.floor((today - d) / 86400000) : 0;
+      return { cliente: v.Cliente, producto: v.Producto, saldo: Number(v['Saldo pendiente']||0), dias, precio: Number(v['Precio venta']||0), abono: Number(v['Abono inicial']||0) };
+    })
+    .filter(r => r.dias >= 14)
+    .sort((a,b) => b.dias - a.dias)
+    .slice(0, 6);
+
+  const html = alertas.map(r => {
+    const cls = r.dias >= 20 ? 'danger' : 'warn';
+    const badgeCls = r.dias >= 20 ? 'badge-danger' : 'badge-warn';
+    const extra = r.abono === 0 ? ' · sin abono' : '';
+    return `<div class="alert-card ${cls}">
+      <div>
+        <div class="alert-name">${(r.cliente||'').trim()}</div>
+        <div class="alert-detail">${(r.producto||'').trim()} · ${r.dias} días${extra}</div>
+      </div>
+      <span class="badge ${badgeCls}">$${fmt$(r.saldo)}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('alertas-list').innerHTML = html || '<div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:20px">No hay alertas críticas</div>';
+}
+
+function renderDespacho(ventas) {
+  const saldadas = ventas
+    .filter(v => Number(v['Saldo pendiente']||0) === 0 && !isTest(v.Cliente))
+    .slice(0, 5);
+  const html = saldadas.map(v => `
+    <div class="alert-card ok">
+      <div>
+        <div class="alert-name">${(v.Cliente||'').trim()}</div>
+        <div class="alert-detail">${(v.Producto||'').trim()}</div>
+      </div>
+      <span class="badge badge-ok">Saldada</span>
+    </div>`).join('');
+  const extra = saldadas.length === 5 ? '<div style="text-align:center;padding:14px;color:var(--text-muted);font-size:0.85rem">Mostrando últimas 5</div>' : '';
+  document.getElementById('despacho-list').innerHTML = (html || '<div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:20px">Sin ventas saldadas pendientes</div>') + extra;
+}
+
+// Initial load
+loadAll();
+// Auto-refresh every 5 minutes
+setInterval(loadAll, 5 * 60 * 1000);
 </script>
 
 </body>
