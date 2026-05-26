@@ -183,6 +183,21 @@ tbody tr:last-child td{border-bottom:none}
 .error-banner{padding:14px;background:rgba(196,74,74,0.08);border:1px solid rgba(196,74,74,0.2);border-radius:10px;color:var(--red);margin-bottom:24px;display:none}
 .error-banner.show{display:block}
 
+.period-bar{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 20px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;margin-bottom:28px;flex-wrap:wrap;box-shadow:var(--shadow-sm)}
+.period-bar-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.period-bar-label{font-size:0.7rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);font-weight:600}
+.period-pills{display:flex;gap:6px;flex-wrap:wrap}
+.period-pill{padding:7px 14px;background:var(--bg-soft);border:1px solid var(--border);border-radius:50px;color:var(--text-muted);font-size:0.82rem;cursor:pointer;font-family:inherit;font-weight:500;transition:all 0.2s}
+.period-pill:hover{border-color:var(--gold);color:var(--gold)}
+.period-pill.active{background:var(--gold);color:white;border-color:var(--gold);font-weight:600}
+.period-info{font-size:0.82rem;color:var(--text-muted)}
+.period-info strong{color:var(--text);font-weight:600}
+
+.kpi-split{display:flex;justify-content:space-between;align-items:baseline;gap:14px;margin-top:6px;padding-top:8px;border-top:1px dashed var(--border)}
+.kpi-split-item{display:flex;flex-direction:column;flex:1}
+.kpi-split-label{font-size:0.65rem;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);font-weight:600;margin-bottom:2px}
+.kpi-split-value{font-size:0.95rem;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+
 @media(max-width:600px){
   body{padding:20px 14px 60px}
   .brand-title{font-size:1.7rem}
@@ -214,6 +229,21 @@ tbody tr:last-child td{border-bottom:none}
 
 <div class="error-banner" id="error-banner"></div>
 
+<!-- PERIOD SELECTOR -->
+<div class="period-bar">
+  <div class="period-bar-left">
+    <span class="period-bar-label">Período</span>
+    <div class="period-pills" id="period-pills">
+      <button class="period-pill" data-period="mes-actual">Mes actual</button>
+      <button class="period-pill" data-period="mes-anterior">Mes anterior</button>
+      <button class="period-pill active" data-period="ultimos-30">Últimos 30 días</button>
+      <button class="period-pill" data-period="anio-actual">Año actual</button>
+      <button class="period-pill" data-period="todo">Todo el periodo</button>
+    </div>
+  </div>
+  <div class="period-info" id="period-info">&nbsp;</div>
+</div>
+
 <!-- KPIs -->
 <div class="kpi-grid">
   <div class="kpi">
@@ -225,6 +255,16 @@ tbody tr:last-child td{border-bottom:none}
     <div class="kpi-label">Ventas registradas</div>
     <div class="kpi-value" id="kpi-ventas"><span class="kpi-currency">$</span><span class="skeleton">000</span></div>
     <div class="kpi-sub" id="kpi-ventas-sub">&nbsp;</div>
+    <div class="kpi-split">
+      <div class="kpi-split-item">
+        <span class="kpi-split-label">Sin ITBMS</span>
+        <span class="kpi-split-value" id="kpi-ventas-sinitbms">$0</span>
+      </div>
+      <div class="kpi-split-item" style="text-align:right">
+        <span class="kpi-split-label">ITBMS 7%</span>
+        <span class="kpi-split-value" id="kpi-ventas-itbms">$0</span>
+      </div>
+    </div>
   </div>
   <div class="kpi">
     <div class="kpi-label">Total abonado</div>
@@ -243,7 +283,7 @@ tbody tr:last-child td{border-bottom:none}
   <div class="card card-chart">
     <div style="padding:8px 8px 16px">
       <h2 class="section-title" style="font-size:1.2rem">Ventas vs Abonos</h2>
-      <p class="section-sub">Últimos 30 días</p>
+      <p class="section-sub" id="chart-sub">Últimos 30 días</p>
     </div>
     <div class="chart-box"><canvas id="chartFlow"></canvas></div>
   </div>
@@ -286,6 +326,35 @@ tbody tr:last-child td{border-bottom:none}
           </tr>
         </thead>
         <tbody id="tabla-cobrar"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- HISTORICO MENSUAL -->
+<div class="section">
+  <div class="section-head">
+    <div>
+      <h2 class="section-title">Histórico mensual</h2>
+      <p class="section-sub">Ventas, abonos e ITBMS recaudado mes por mes desde el primer registro</p>
+    </div>
+    <span class="tag" id="historico-total">$0 vendido total</span>
+  </div>
+  <div class="card" style="padding:24px">
+    <div class="chart-box" style="height:280px;margin-bottom:24px"><canvas id="chartHistorico"></canvas></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Mes</th>
+            <th class="cell-num">Ventas (con ITBMS)</th>
+            <th class="cell-num">Sin ITBMS</th>
+            <th class="cell-num">ITBMS 7%</th>
+            <th class="cell-num">Abonos</th>
+            <th class="cell-num"># Ventas</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-historico"></tbody>
       </table>
     </div>
   </div>
@@ -354,6 +423,7 @@ const SHEET_ID = '1sM3inbhdDt2FpF6jNPg1cJQn9WfFTnwuJBNB-hmO4Tw';
 const GVIZ = (sheet) => `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheet)}`;
 
 let chartFlow = null;
+let chartHistorico = null;
 
 async function readSheet(name) {
   const r = await fetch(GVIZ(name));
@@ -387,6 +457,140 @@ const isTest = c => /test|prueba|juanda|cliente prueba|test fix|test final/i.tes
 const fmt$ = n => n.toLocaleString('en-US', {maximumFractionDigits: 0});
 const fmt$2 = n => n.toLocaleString('en-US', {maximumFractionDigits: 2});
 
+let currentPeriod = 'ultimos-30';
+let cachedVentas = null;
+let cachedAbonos = null;
+
+const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+function getPeriodRange(period) {
+  const today = new Date();
+  const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (period === 'mes-actual') {
+    const from = new Date(today.getFullYear(), today.getMonth(), 1);
+    const to = new Date(today.getFullYear(), today.getMonth()+1, 0, 23, 59, 59);
+    return { from, to, label: MESES_ES[today.getMonth()] + ' ' + today.getFullYear() };
+  }
+  if (period === 'mes-anterior') {
+    const from = new Date(today.getFullYear(), today.getMonth()-1, 1);
+    const to = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59);
+    return { from, to, label: MESES_ES[from.getMonth()] + ' ' + from.getFullYear() };
+  }
+  if (period === 'ultimos-30') {
+    const from = new Date(t0.getTime() - 29*86400000);
+    const to = new Date(t0.getTime() + 86400000 - 1);
+    return { from, to, label: 'últimos 30 días' };
+  }
+  if (period === 'anio-actual') {
+    const from = new Date(today.getFullYear(), 0, 1);
+    const to = new Date(today.getFullYear(), 11, 31, 23, 59, 59);
+    return { from, to, label: 'año ' + today.getFullYear() };
+  }
+  return { from: new Date(2000,0,1), to: new Date(2100,0,1), label: 'todo el periodo' };
+}
+
+function inRange(item, dateField, range) {
+  const d = parseDate(item[dateField]);
+  if (!d) return false;
+  return d >= range.from && d <= range.to;
+}
+
+function setPeriod(period) {
+  currentPeriod = period;
+  document.querySelectorAll('.period-pill').forEach(b => {
+    b.classList.toggle('active', b.dataset.period === period);
+  });
+  if (cachedVentas && cachedAbonos) renderAll();
+}
+
+function renderAll() {
+  const range = getPeriodRange(currentPeriod);
+  const ventasReales = cachedVentas.filter(v => v.Cliente && !isTest(v.Cliente));
+  const abonosReales = cachedAbonos.filter(a => a.Cliente && !isTest(a.Cliente));
+  const ventasPeriodo = ventasReales.filter(v => inRange(v, 'Fecha', range));
+  const abonosPeriodo = abonosReales.filter(a => inRange(a, 'Fecha', range));
+
+  document.getElementById('period-info').innerHTML = 'Mostrando <strong>' + range.label + '</strong> · ' + ventasPeriodo.length + ' ventas, ' + abonosPeriodo.length + ' abonos';
+
+  renderKPIs(ventasPeriodo, abonosPeriodo, ventasReales);
+  renderConsignantes(ventasPeriodo);
+  renderTimeSeries(ventasPeriodo, abonosPeriodo, range);
+  renderHistoricoMensual(ventasReales, abonosReales);
+  renderCuentasPorCobrar(ventasReales);
+  renderAlertas(ventasReales);
+  renderDespacho(ventasReales);
+}
+
+function renderHistoricoMensual(ventas, abonos) {
+  const bucket = {};
+  const ensureMonth = (y, m) => {
+    const key = y + '-' + String(m+1).padStart(2,'0');
+    if (!bucket[key]) bucket[key] = { y, m, ventasTotal: 0, ventasSinItbms: 0, itbms: 0, abonos: 0, count: 0 };
+    return bucket[key];
+  };
+  ventas.forEach(v => {
+    const d = parseDate(v.Fecha);
+    if (!d) return;
+    const b = ensureMonth(d.getFullYear(), d.getMonth());
+    const precio = Number(v['Precio venta']||0);
+    b.ventasTotal += precio;
+    b.ventasSinItbms += precio / 1.07;
+    b.itbms += precio - (precio / 1.07);
+    b.count++;
+  });
+  abonos.forEach(a => {
+    const d = parseDate(a.Fecha);
+    if (!d) return;
+    const b = ensureMonth(d.getFullYear(), d.getMonth());
+    b.abonos += Number(a['Monto abono']||0);
+  });
+  const meses = Object.values(bucket).sort((a,b) => (a.y - b.y) || (a.m - b.m));
+  const totalVendido = meses.reduce((s,b) => s + b.ventasTotal, 0);
+  document.getElementById('historico-total').textContent = '$' + fmt$(totalVendido) + ' vendido total';
+
+  const tbody = document.getElementById('tabla-historico');
+  tbody.innerHTML = '';
+  meses.slice().reverse().forEach(b => {
+    const label = MESES_ES[b.m].charAt(0).toUpperCase() + MESES_ES[b.m].slice(1) + ' ' + b.y;
+    tbody.insertAdjacentHTML('beforeend', `<tr>
+      <td><strong>${label}</strong></td>
+      <td class="cell-num cell-amount">$${fmt$2(b.ventasTotal)}</td>
+      <td class="cell-num">$${fmt$2(b.ventasSinItbms)}</td>
+      <td class="cell-num cell-muted">$${fmt$2(b.itbms)}</td>
+      <td class="cell-num" style="color:var(--teal);font-weight:600">$${fmt$2(b.abonos)}</td>
+      <td class="cell-num">${b.count}</td>
+    </tr>`);
+  });
+
+  const labels = meses.map(b => MESES_ES[b.m].slice(0,3) + ' ' + String(b.y).slice(2));
+  const dataV = meses.map(b => Math.round(b.ventasTotal));
+  const dataA = meses.map(b => Math.round(b.abonos));
+  const canvas = document.getElementById('chartHistorico');
+  if (!canvas) return;
+  if (chartHistorico) chartHistorico.destroy();
+  chartHistorico = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Ventas ($)', data: dataV, backgroundColor: 'rgba(184,146,58,0.7)', borderColor: '#b8923a', borderWidth: 1, borderRadius: 6 },
+        { label: 'Abonos ($)', data: dataA, backgroundColor: 'rgba(94,196,172,0.6)', borderColor: '#5ec4ac', borderWidth: 1, borderRadius: 6 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', align: 'end', labels: { color:'#6b6b78', font:{family:'Inter',size:11}, boxWidth:10, boxHeight:10, padding:18 } },
+        tooltip: { backgroundColor:'#ffffff', borderColor:'#dcd4c2', borderWidth:1, titleColor:'#b8923a', bodyColor:'#1a1a24', padding:12, callbacks:{label:c=>c.dataset.label+': $'+c.parsed.y.toLocaleString()} }
+      },
+      scales: {
+        x: { grid:{display:false}, ticks:{color:'#9a9aa8',font:{family:'Inter',size:10}} },
+        y: { grid:{color:'rgba(60,50,20,0.05)'}, ticks:{color:'#9a9aa8',font:{family:'Inter',size:10},callback:v=>'$'+(v>=1000?(v/1000)+'k':v)} }
+      }
+    }
+  });
+}
+
 async function loadAll() {
   const overlay = document.getElementById('loading-overlay');
   const err = document.getElementById('error-banner');
@@ -399,20 +603,14 @@ async function loadAll() {
       readSheet('ABONOS')
     ]);
 
-    const ventasReales = ventas.filter(v => v.Cliente && !isTest(v.Cliente));
-    const abonosReales = abonos.filter(a => a.Cliente && !isTest(a.Cliente));
+    cachedVentas = ventas;
+    cachedAbonos = abonos;
 
-    renderKPIs(ventasReales, abonosReales);
-    renderConsignantes(ventasReales);
-    renderTimeSeries(ventasReales, abonosReales);
-    renderCuentasPorCobrar(ventasReales);
-    renderAlertas(ventasReales);
-    renderDespacho(ventasReales);
+    renderAll();
 
     // Update timestamp
     const now = new Date();
-    const months=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-    document.getElementById('meta-date').textContent = now.getDate()+' '+months[now.getMonth()]+' '+now.getFullYear();
+    document.getElementById('meta-date').textContent = now.getDate()+' '+MESES_ES[now.getMonth()]+' '+now.getFullYear();
     document.getElementById('meta-ts').textContent = 'Actualizado: ' + now.toLocaleTimeString('es-PA', {hour:'2-digit', minute:'2-digit'});
   } catch(e) {
     console.error(e);
@@ -423,19 +621,29 @@ async function loadAll() {
   }
 }
 
-function renderKPIs(ventas, abonos) {
-  const totalPorCobrar = ventas.reduce((s,v) => s + Math.max(0, Number(v['Saldo pendiente']||0)), 0);
+function renderKPIs(ventas, abonos, ventasGlobal) {
+  // Por cobrar y despacho usan TODO el histórico (no solo el periodo) porque son estados actuales
+  const ventasParaSaldo = ventasGlobal || ventas;
+  const totalPorCobrar = ventasParaSaldo.reduce((s,v) => s + Math.max(0, Number(v['Saldo pendiente']||0)), 0);
+  const abiertas = ventasParaSaldo.filter(v => Number(v['Saldo pendiente']||0) > 0).length;
+  const saldadas = ventasParaSaldo.filter(v => Number(v['Saldo pendiente']||0) === 0 && !isTest(v.Cliente)).length;
+
+  // Ventas y abonos del periodo seleccionado
   const totalVentas = ventas.reduce((s,v) => s + Number(v['Precio venta']||0), 0);
   const totalAbonado = abonos.reduce((s,a) => s + Number(a['Monto abono']||0), 0);
   const clientes = new Set(ventas.map(v => (v.Cliente||'').trim().toLowerCase())).size;
-  const abiertas = ventas.filter(v => Number(v['Saldo pendiente']||0) > 0).length;
-  const saldadas = ventas.filter(v => Number(v['Saldo pendiente']||0) === 0 && !isTest(v.Cliente)).length;
+
+  // Split ITBMS: el precio que se cobra ya incluye 7% ITBMS, calcular base imponible
+  const ventasSinItbms = totalVentas / 1.07;
+  const itbms = totalVentas - ventasSinItbms;
 
   document.getElementById('kpi-porcobrar').innerHTML = '<span class="kpi-currency">$</span>' + fmt$(totalPorCobrar);
   document.getElementById('kpi-porcobrar-sub').innerHTML = `<strong>${abiertas}</strong> ventas con saldo abierto`;
 
   document.getElementById('kpi-ventas').innerHTML = '<span class="kpi-currency">$</span>' + fmt$(totalVentas);
-  document.getElementById('kpi-ventas-sub').innerHTML = `<strong>${ventas.length}</strong> ventas totales · <strong>${clientes}</strong> clientes`;
+  document.getElementById('kpi-ventas-sub').innerHTML = `<strong>${ventas.length}</strong> ventas · <strong>${clientes}</strong> clientes`;
+  document.getElementById('kpi-ventas-sinitbms').textContent = '$' + fmt$2(ventasSinItbms);
+  document.getElementById('kpi-ventas-itbms').textContent = '$' + fmt$2(itbms);
 
   document.getElementById('kpi-abonado').innerHTML = '<span class="kpi-currency">$</span>' + fmt$(totalAbonado);
   document.getElementById('kpi-abonado-sub').innerHTML = `<strong>${abonos.length}</strong> abonos recibidos`;
@@ -465,24 +673,43 @@ function renderConsignantes(ventas) {
   document.getElementById('consig-list').innerHTML = html;
 }
 
-function renderTimeSeries(ventas, abonos) {
-  const today = new Date();
+function renderTimeSeries(ventas, abonos, range) {
+  range = range || getPeriodRange(currentPeriod);
+  const chartSub = document.getElementById('chart-sub');
+  if (chartSub) chartSub.textContent = range.label.charAt(0).toUpperCase() + range.label.slice(1);
   const days = [];
-  for (let i=29; i>=0; i--) {
-    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
-    days.push({ label: d.toISOString().slice(0,10), display: d.toLocaleDateString('es-PA',{day:'numeric',month:'short'}), ventas: 0, abonos: 0 });
+  // Determinar granularidad según rango
+  const totalDays = Math.ceil((range.to - range.from) / 86400000);
+  let stepDays = 1;
+  let bucketLabel;
+  if (totalDays > 95) {
+    stepDays = Math.ceil(totalDays / 30);
+    bucketLabel = d => d.toLocaleDateString('es-PA',{day:'numeric',month:'short'});
+  } else if (totalDays > 32) {
+    stepDays = 1;
+    bucketLabel = d => d.toLocaleDateString('es-PA',{day:'numeric',month:'short'});
+  } else {
+    stepDays = 1;
+    bucketLabel = d => d.toLocaleDateString('es-PA',{day:'numeric',month:'short'});
   }
+  // Construir buckets
+  const start = new Date(range.from.getFullYear(), range.from.getMonth(), range.from.getDate());
+  for (let cursor = new Date(start); cursor <= range.to; cursor = new Date(cursor.getTime() + stepDays*86400000)) {
+    const next = new Date(cursor.getTime() + stepDays*86400000);
+    days.push({ from: new Date(cursor), to: next, display: bucketLabel(cursor), ventas: 0, abonos: 0 });
+  }
+  if (days.length === 0) days.push({ from: range.from, to: range.to, display: '—', ventas: 0, abonos: 0 });
   ventas.forEach(v => {
     const d = parseDate(v.Fecha);
     if (!d) return;
-    const day = days.find(x => x.label === d.toISOString().slice(0,10));
-    if (day) day.ventas += Number(v['Precio venta']||0);
+    const bucket = days.find(x => d >= x.from && d < x.to);
+    if (bucket) bucket.ventas += Number(v['Precio venta']||0);
   });
   abonos.forEach(a => {
     const d = parseDate(a.Fecha);
     if (!d) return;
-    const day = days.find(x => x.label === d.toISOString().slice(0,10));
-    if (day) day.abonos += Number(a['Monto abono']||0);
+    const bucket = days.find(x => d >= x.from && d < x.to);
+    if (bucket) bucket.abonos += Number(a['Monto abono']||0);
   });
 
   const labels = days.map(d => d.display);
@@ -603,6 +830,11 @@ function renderDespacho(ventas) {
   const extra = saldadas.length === 5 ? '<div style="text-align:center;padding:14px;color:var(--text-muted);font-size:0.85rem">Mostrando últimas 5</div>' : '';
   document.getElementById('despacho-list').innerHTML = (html || '<div style="color:var(--text-muted);font-size:0.85rem;text-align:center;padding:20px">Sin ventas saldadas pendientes</div>') + extra;
 }
+
+// Wire up period selector
+document.querySelectorAll('.period-pill').forEach(b => {
+  b.addEventListener('click', () => setPeriod(b.dataset.period));
+});
 
 // Initial load
 loadAll();
