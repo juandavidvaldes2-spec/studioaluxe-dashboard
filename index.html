@@ -360,6 +360,34 @@ tbody tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<!-- PROVEEDORES -->
+<div class="section">
+  <div class="section-head">
+    <div>
+      <h2 class="section-title">Proveedores</h2>
+      <p class="section-sub">Ficha de cada proveedor con su código y datos para pagar comisión</p>
+    </div>
+    <span class="tag" id="prov-total">0 proveedores</span>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Nombre</th>
+            <th>Celular</th>
+            <th>Comisión</th>
+            <th>Tipo</th>
+            <th>Banco / Cuenta</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-proveedores"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <!-- ALERTAS / VENCIDAS -->
 <div class="two-col">
   <div class="card">
@@ -608,6 +636,9 @@ async function loadAll() {
 
     renderAll();
 
+    // Proveedores: carga aparte y tolerante (si la hoja aun no existe, no rompe el resto)
+    readSheet('PROVEEDORES').then(renderProveedores).catch(() => {});
+
     // Update timestamp
     const now = new Date();
     document.getElementById('meta-date').textContent = now.getDate()+' '+MESES_ES[now.getMonth()]+' '+now.getFullYear();
@@ -671,6 +702,22 @@ function renderConsignantes(ventas) {
       <span class="consig-stat">$${fmt$2(d.deuda)}</span>
     </div>`).join('');
   document.getElementById('consig-list').innerHTML = html;
+}
+
+function renderProveedores(provs) {
+  const tbody = document.getElementById('tabla-proveedores');
+  if (!tbody) return;
+  const total = document.getElementById('prov-total');
+  if (total) total.textContent = provs.length + (provs.length === 1 ? ' proveedor' : ' proveedores');
+  tbody.innerHTML = provs.map(p => `
+    <tr>
+      <td style="font-weight:700;color:var(--gold)">${p.codigo || ''}</td>
+      <td>${p.nombre || ''}</td>
+      <td>${p.celular || ''}</td>
+      <td>${p.comision || ''}</td>
+      <td>${p.tipo || ''}</td>
+      <td>${(p.banco || '') + (p.num_cuenta ? ' · ' + p.num_cuenta : '')}</td>
+    </tr>`).join('');
 }
 
 function renderTimeSeries(ventas, abonos, range) {
