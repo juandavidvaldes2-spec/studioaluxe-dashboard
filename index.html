@@ -388,6 +388,58 @@ tbody tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<!-- PAQUETES QUE ENTRAN -->
+<div class="section">
+  <div class="section-head">
+    <div>
+      <h2 class="section-title">Paquetes que entran</h2>
+      <p class="section-sub">Cada paquete que Yasmany inventaría, con su proveedor</p>
+    </div>
+    <span class="tag" id="paq-total">0 paquetes</span>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha inventario</th>
+            <th>Proveedor</th>
+            <th>Código</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-paquetes"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- RESTAURACIONES -->
+<div class="section">
+  <div class="section-head">
+    <div>
+      <h2 class="section-title">Restauraciones</h2>
+      <p class="section-sub">Piezas mandadas a arreglar y su estado</p>
+    </div>
+    <span class="tag" id="rest-total">0 en reparación</span>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Código pieza</th>
+            <th>Enviada a</th>
+            <th>Fecha enviada</th>
+            <th>Estado</th>
+            <th>Fecha recibida</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-restauraciones"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <!-- ALERTAS / VENCIDAS -->
 <div class="two-col">
   <div class="card">
@@ -638,6 +690,9 @@ async function loadAll() {
 
     // Proveedores: carga aparte y tolerante (si la hoja aun no existe, no rompe el resto)
     readSheet('PROVEEDORES').then(renderProveedores).catch(() => {});
+    // Paquetes y Restauraciones: carga aparte y tolerante (si la hoja aun no existe, no rompe el resto)
+    readSheet('Paquetes').then(renderPaquetes).catch(() => {});
+    readSheet('Restauraciones').then(renderRestauraciones).catch(() => {});
 
     // Update timestamp
     const now = new Date();
@@ -718,6 +773,40 @@ function renderProveedores(provs) {
       <td>${p.tipo || ''}</td>
       <td>${(p.banco || '') + (p.num_cuenta ? ' · ' + p.num_cuenta : '')}</td>
     </tr>`).join('');
+}
+
+function renderPaquetes(paqs) {
+  const tbody = document.getElementById('tabla-paquetes');
+  if (!tbody) return;
+  const total = document.getElementById('paq-total');
+  if (total) total.textContent = paqs.length + (paqs.length === 1 ? ' paquete' : ' paquetes');
+  tbody.innerHTML = paqs.slice().reverse().map(p => `
+    <tr>
+      <td>${p.fecha_inventario || ''}</td>
+      <td>${p.proveedor_nombre || ''}</td>
+      <td style="font-weight:700;color:var(--gold)">${p.proveedor_codigo || ''}</td>
+    </tr>`).join('');
+}
+
+function renderRestauraciones(rests) {
+  const tbody = document.getElementById('tabla-restauraciones');
+  if (!tbody) return;
+  const enRep = rests.filter(r => String(r.estado || '').toLowerCase().indexOf('reparacion') !== -1).length;
+  const total = document.getElementById('rest-total');
+  if (total) total.textContent = enRep + ' en reparación';
+  tbody.innerHTML = rests.slice().reverse().map(r => {
+    const enReparacion = String(r.estado || '').toLowerCase().indexOf('reparacion') !== -1;
+    const color = enReparacion ? '#b8923a' : '#2e9e6f';
+    const label = enReparacion ? 'En reparación' : 'Lista para venta';
+    return `
+    <tr>
+      <td style="font-weight:700">${r.codigo_pieza || ''}</td>
+      <td>${r.enviado_a || ''}</td>
+      <td>${r.fecha_enviado || ''}</td>
+      <td><span style="color:${color};font-weight:600">${label}</span></td>
+      <td>${r.fecha_recibido || ''}</td>
+    </tr>`;
+  }).join('');
 }
 
 function renderTimeSeries(ventas, abonos, range) {
